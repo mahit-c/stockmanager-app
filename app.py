@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import sqlite3
-from polygon import RESTClient
 import pandas as pd
 
 #Creating a local DB with SQLITE for data persistance:
