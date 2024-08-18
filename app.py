@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import sqlite3
+from polygon import RESTClient
 import pandas as pd
 
 #Creating a local DB with SQLITE for data persistance:
@@ -90,16 +91,25 @@ if 'cash_amount' not in st.session_state:
     st.session_state.cash_amount = 0  # Initialize cash_amount
 
 
-def get_stock_price (symbol): #Getting current ticker price
+def get_stock_price (symbol): #Getting current/weekly ticker price
     
     #Getting current price:
     try:
         url = f"https://api.tiingo.com/tiingo/daily/{symbol}/prices?token={TIINGO_API_KEY}"
         resp = requests.get(url)
         data = resp.json()
-    except Exception as e:
-        st.error(f"Error fetching current price: {e}")
+        
+    except requests.RequestException as e:
+        st.error(f"An error occurred while fetching data: {str(e)}")
         return None
+    
+    except ValueError as e:  # This will catch JSON decoding errors
+        st.error(f"Error parsing the API response: {str(e)}")
+        return None
+    
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {str(e)}")
+        return None   
 
     print (data)
     if len(data) > 0:
@@ -108,30 +118,7 @@ def get_stock_price (symbol): #Getting current ticker price
     
     return None
     
- 
- 
-def search_symbol(keywords):
-    #Searching for stock symbols based on user input keywords.
-    try:
-        url = f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={keywords}&apikey={ALPHA_VANTAGE_API_KEY}"
-        response = requests.get(url)
-        data = response.json()
-        
-        if "bestMatches" in data:
-            return data["bestMatches"]
-        return []
-    
-    except requests.RequestException as e:
-        st.error(f"An error occurred while fetching data: {str(e)}")
-        return []
-    
-    except ValueError as e:  # Catching JSON decoding errors
-        st.error(f"Error parsing the API response: {str(e)}")
-        return []
-    
-    except Exception as e:
-        st.error(f"An unexpected error occurred: {str(e)}")
-        return []    
+
 
 def update_cash_balance(amount, action):
     if (action == "Add"):
@@ -188,6 +175,7 @@ def execute_share_purchase(price, quantity, action, symbol):
 
 st.set_page_config(page_title="Stock Portfolio Manager", page_icon="📈")
 st.title ("Stock Portfolio Manager 📈")
+# st.markdown(get_stock_price("GOOG"))
 
 
 #Implementing cash balance management:
@@ -241,7 +229,7 @@ with stock_col1:
                     else:
                         st.error(message)
     
-    else: #Handling selling scenario
+    else:
         if st.session_state.user_portfolio:
                 stock_sell = st.selectbox(
                     "Select Stock to Sell", 
@@ -270,13 +258,13 @@ with stock_col2:
 #Implementing total asset portfolio:
 st.header("Current Portfolio")
 if st.session_state.user_portfolio:
-   # Fetching prices once for each symbol
+   # Fetch prices once for each symbol
     prices = {}
     for symbol in st.session_state.user_portfolio.keys():
         if symbol not in prices:
-            prices[symbol] = get_stock_price(symbol)  
+            prices[symbol] = get_stock_price(symbol)  # Fetch the stock price only once per symbol
 
-    # Creating portfolio data using the fetched prices
+    # Create portfolio data using the cached prices
     portfolio_data = {
         'Symbol': list(st.session_state.user_portfolio.keys()),
         'Quantity': [round(q, 2) for q in st.session_state.user_portfolio.values()],
