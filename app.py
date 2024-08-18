@@ -95,27 +95,32 @@ def get_stock_price (symbol): #Getting current/weekly ticker price
     #Getting current price:
     try:
         url = f"https://api.tiingo.com/tiingo/daily/{symbol}/prices?token={TIINGO_API_KEY}"
-        resp = requests.get(url)
-        data = resp.json()
+        response = requests.get(url)
+        data = response.json()
         
-    except requests.RequestException as e:
-        st.error(f"An error occurred while fetching data: {str(e)}")
-        return None
-    
-    except ValueError as e:  # This will catch JSON decoding errors
-        st.error(f"Error parsing the API response: {str(e)}")
-        return None
-    
-    except Exception as e:
-        st.error(f"An unexpected error occurred: {str(e)}")
-        return None   
+        # Check if the response is successful
+        if response.status_code == 200:
+            data = response.json()
 
-    print (data)
-    if len(data) > 0:
-        latest_price = data[0]['close']  # Latest close price
-        return latest_price
-    
-    return None
+            # Ensure the data is valid
+            if isinstance(data, list) and len(data) > 0:
+                return data[0]['close']
+            else:
+                st.error("Invalid response from the API. Please try again.")
+                return None
+        else:
+            # Handle specific API errors
+            if response.status_code == 429:  # Rate limit exceeded
+                st.error("You have run over your hourly request allocation. Please try again later.")
+            elif response.status_code == 404:  # Symbol not found
+                st.error(f"The symbol '{symbol}' is not valid. Please check and try again.")
+            else:
+                st.error("An error occurred while fetching stock data. Please try again.")
+            return None
+
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {e}")
+        return None
     
 
 
